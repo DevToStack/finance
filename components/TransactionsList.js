@@ -1,6 +1,6 @@
 // components/TransactionsList.js
 "use client";
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
     FiSearch, FiFilter, FiEdit2, FiTrash2, FiDownload,
     FiChevronLeft, FiChevronRight, FiCalendar, FiCheckCircle,
@@ -8,26 +8,50 @@ import {
 } from 'react-icons/fi';
 import useStore from '@/lib/store';
 
-const STATUS_BADGES = {
-    completed: { bg: 'bg-green-100 dark:bg-green-950/30', text: 'text-green-700 dark:text-green-400', icon: FiCheckCircle },
-    pending: { bg: 'bg-yellow-100 dark:bg-yellow-950/30', text: 'text-yellow-700 dark:text-yellow-400', icon: FiClock }
+// Dynamic status badges that will work with theme
+const getStatusBadgeStyles = (status, isDarkMode) => {
+    const baseStyles = {
+        completed: {
+            bg: isDarkMode ? 'bg-green-950/30' : 'bg-green-100',
+            text: isDarkMode ? 'text-green-400' : 'text-green-700',
+            icon: FiCheckCircle
+        },
+        pending: {
+            bg: isDarkMode ? 'bg-yellow-950/30' : 'bg-yellow-100',
+            text: isDarkMode ? 'text-yellow-400' : 'text-yellow-700',
+            icon: FiClock
+        }
+    };
+
+    return baseStyles[status] || {
+        bg: isDarkMode ? 'bg-gray-800' : 'bg-gray-100',
+        text: isDarkMode ? 'text-gray-400' : 'text-gray-700',
+        icon: FiClock
+    };
 };
 
-// Default status badge for missing or invalid status
-const DEFAULT_STATUS_BADGE = { bg: 'bg-gray-100 dark:bg-gray-800', text: 'text-gray-700 dark:text-gray-400', icon: FiClock };
+// Dynamic category colors that will work with theme
+const getCategoryStyles = (category, isDarkMode) => {
+    const categoryColors = {
+        'Salary': { light: 'bg-blue-100 text-blue-700', dark: 'bg-blue-950/30 text-blue-400' },
+        'Freelance': { light: 'bg-blue-100 text-blue-700', dark: 'bg-blue-950/30 text-blue-400' },
+        'Investments': { light: 'bg-blue-100 text-blue-700', dark: 'bg-blue-950/30 text-blue-400' },
+        'Food': { light: 'bg-red-100 text-red-700', dark: 'bg-red-950/30 text-red-400' },
+        'Rent': { light: 'bg-purple-100 text-purple-700', dark: 'bg-purple-950/30 text-purple-400' },
+        'Transport': { light: 'bg-yellow-100 text-yellow-700', dark: 'bg-yellow-950/30 text-yellow-400' },
+        'Utilities': { light: 'bg-green-100 text-green-700', dark: 'bg-green-950/30 text-green-400' },
+        'Shopping': { light: 'bg-pink-100 text-pink-700', dark: 'bg-pink-950/30 text-pink-400' },
+        'Entertainment': { light: 'bg-orange-100 text-orange-700', dark: 'bg-orange-950/30 text-orange-400' },
+        'Health': { light: 'bg-teal-100 text-teal-700', dark: 'bg-teal-950/30 text-teal-400' },
+        'Education': { light: 'bg-indigo-100 text-indigo-700', dark: 'bg-indigo-950/30 text-indigo-400' }
+    };
 
-const CATEGORY_COLORS = {
-    'Salary': 'bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400',
-    'Freelance': 'bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400',
-    'Investments': 'bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400',
-    'Food': 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400',
-    'Rent': 'bg-purple-100 text-purple-700 dark:bg-purple-950/30 dark:text-purple-400',
-    'Transport': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-400',
-    'Utilities': 'bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400',
-    'Shopping': 'bg-pink-100 text-pink-700 dark:bg-pink-950/30 dark:text-pink-400',
-    'Entertainment': 'bg-orange-100 text-orange-700 dark:bg-orange-950/30 dark:text-orange-400',
-    'Health': 'bg-teal-100 text-teal-700 dark:bg-teal-950/30 dark:text-teal-400',
-    'Education': 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-400'
+    const colors = categoryColors[category] || {
+        light: 'bg-gray-100 text-gray-700',
+        dark: 'bg-gray-800 text-gray-400'
+    };
+
+    return isDarkMode ? colors.dark : colors.light;
 };
 
 export default function TransactionsList({ filterType = null, limit = null }) {
@@ -41,6 +65,23 @@ export default function TransactionsList({ filterType = null, limit = null }) {
     const [editingId, setEditingId] = useState(null);
     const [editForm, setEditForm] = useState({});
     const [showFilters, setShowFilters] = useState(false);
+    const [isDarkMode, setIsDarkMode] = useState(false);
+
+    // Listen for theme changes
+    useEffect(() => {
+        const checkTheme = () => {
+            setIsDarkMode(document.documentElement.classList.contains('dark'));
+        };
+
+        // Initial check
+        checkTheme();
+
+        // Create observer to watch for class changes on html element
+        const observer = new MutationObserver(checkTheme);
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+        return () => observer.disconnect();
+    }, []);
 
     // Apply filterType prop if provided
     const effectiveTypeFilter = filterType || typeFilter;
@@ -85,23 +126,18 @@ export default function TransactionsList({ filterType = null, limit = null }) {
         setCurrentPage(1);
     };
 
-    // Helper function to safely get status badge
-    const getStatusBadge = (status) => {
-        return STATUS_BADGES[status] || DEFAULT_STATUS_BADGE;
-    };
-
     return (
         <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-xl overflow-hidden">
             <div className="p-4 border-b border-[hsl(var(--border))]">
                 <div className="flex flex-col lg:flex-row gap-3 justify-between">
                     <div className="relative flex-1 max-w-md">
-                        <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-[hsl(var(--muted-foreground))] w-4 h-4" />
                         <input
                             type="text"
                             placeholder="Search transactions..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2.5 bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
+                            className="w-full pl-9 pr-4 py-2.5 bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] hover:border-[hsl(var(--ring))] transition-colors"
                         />
                     </div>
                     <div className="flex gap-2 flex-wrap">
@@ -109,7 +145,7 @@ export default function TransactionsList({ filterType = null, limit = null }) {
                             onClick={() => setShowFilters(!showFilters)}
                             className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${showFilters
                                     ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/40'
-                                    : 'bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
+                                    : 'bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))] hover:border-[hsl(var(--ring))]'
                                 }`}
                         >
                             <FiFilter className="w-4 h-4" />
@@ -117,7 +153,7 @@ export default function TransactionsList({ filterType = null, limit = null }) {
                         </button>
                         <button
                             onClick={handleExport}
-                            className="flex items-center gap-2 px-3 py-2 bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded-lg text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-all duration-200"
+                            className="flex items-center gap-2 px-3 py-2 bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded-lg text-sm font-medium hover:bg-[hsl(var(--accent))] hover:border-[hsl(var(--ring))] transition-all duration-200"
                         >
                             <FiDownload className="w-4 h-4" />
                             Export CSV
@@ -126,14 +162,14 @@ export default function TransactionsList({ filterType = null, limit = null }) {
                 </div>
 
                 {showFilters && (
-                    <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900/50 border border-[hsl(var(--border))] rounded-lg">
+                    <div className="mt-4 p-4 bg-[hsl(var(--muted))] border border-[hsl(var(--border))] rounded-lg">
                         <div className="flex flex-wrap gap-3 items-end">
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">Type</label>
+                                <label className="block text-xs text-[hsl(var(--muted-foreground))] mb-1">Type</label>
                                 <select
                                     value={typeFilter}
                                     onChange={(e) => setTypeFilter(e.target.value)}
-                                    className="px-3 py-2 bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
+                                    className="px-3 py-2 bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-[hsl(var(--ring))] transition-colors"
                                 >
                                     <option value="all">All Types</option>
                                     <option value="income">Income</option>
@@ -141,11 +177,11 @@ export default function TransactionsList({ filterType = null, limit = null }) {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">Category</label>
+                                <label className="block text-xs text-[hsl(var(--muted-foreground))] mb-1">Category</label>
                                 <select
                                     value={categoryFilter}
                                     onChange={(e) => setCategoryFilter(e.target.value)}
-                                    className="px-3 py-2 bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
+                                    className="px-3 py-2 bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-[hsl(var(--ring))] transition-colors"
                                 >
                                     <option value="all">All Categories</option>
                                     {categories.map(cat => (
@@ -154,11 +190,11 @@ export default function TransactionsList({ filterType = null, limit = null }) {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">Sort by</label>
+                                <label className="block text-xs text-[hsl(var(--muted-foreground))] mb-1">Sort by</label>
                                 <select
                                     value={sortBy}
                                     onChange={(e) => setSortBy(e.target.value)}
-                                    className="px-3 py-2 bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
+                                    className="px-3 py-2 bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-[hsl(var(--ring))] transition-colors"
                                 >
                                     <option value="date-desc">Newest First</option>
                                     <option value="date-asc">Oldest First</option>
@@ -167,11 +203,11 @@ export default function TransactionsList({ filterType = null, limit = null }) {
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">Per page</label>
+                                <label className="block text-xs text-[hsl(var(--muted-foreground))] mb-1">Per page</label>
                                 <select
                                     value={itemsPerPage}
                                     onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                                    className="px-3 py-2 bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
+                                    className="px-3 py-2 bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hover:border-[hsl(var(--ring))] transition-colors"
                                 >
                                     <option value={10}>10</option>
                                     <option value={25}>25</option>
@@ -181,7 +217,7 @@ export default function TransactionsList({ filterType = null, limit = null }) {
                             </div>
                             <button
                                 onClick={handleClearFilters}
-                                className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-all duration-200"
+                                className="px-3 py-2 text-sm text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))] rounded-lg transition-all duration-200"
                             >
                                 Clear all
                             </button>
@@ -192,22 +228,22 @@ export default function TransactionsList({ filterType = null, limit = null }) {
 
             <div className="overflow-x-auto">
                 <table className="w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-[hsl(var(--border))]">
+                    <thead className="bg-[hsl(var(--muted))] border-b border-[hsl(var(--border))]">
                         <tr>
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Description</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Category</th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                            <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Amount</th>
-                            {role === 'admin' && <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>}
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">Date</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">Description</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">Category</th>
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">Status</th>
+                            <th className="text-right px-4 py-3 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">Amount</th>
+                            {role === 'admin' && <th className="text-center px-4 py-3 text-xs font-semibold text-[hsl(var(--muted-foreground))] uppercase tracking-wider">Actions</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-[hsl(var(--border))]">
                         {paginatedTransactions.length === 0 ? (
                             <tr>
-                                <td colSpan={role === 'admin' ? 6 : 5} className="text-center py-12 text-gray-500">
+                                <td colSpan={role === 'admin' ? 6 : 5} className="text-center py-12 text-[hsl(var(--muted-foreground))]">
                                     <div className="flex flex-col items-center gap-2">
-                                        <FiSearch className="w-8 h-8 text-gray-300" />
+                                        <FiSearch className="w-8 h-8 text-[hsl(var(--muted-foreground))]" />
                                         <p>No transactions found</p>
                                         <button
                                             onClick={handleClearFilters}
@@ -220,12 +256,13 @@ export default function TransactionsList({ filterType = null, limit = null }) {
                             </tr>
                         ) : (
                             paginatedTransactions.map((transaction) => {
-                                // Safely get status badge
-                                const statusBadge = getStatusBadge(transaction.status);
+                                // Get dynamic styles based on current theme
+                                const statusBadge = getStatusBadgeStyles(transaction.status, isDarkMode);
                                 const StatusIcon = statusBadge.icon;
+                                const categoryStyle = getCategoryStyles(transaction.category, isDarkMode);
 
                                 return (
-                                    <tr key={transaction.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150">
+                                    <tr key={transaction.id} className="hover:bg-[hsl(var(--accent))] transition-colors duration-150">
                                         {editingId === transaction.id ? (
                                             <>
                                                 <td className="px-4 py-3">
@@ -233,7 +270,7 @@ export default function TransactionsList({ filterType = null, limit = null }) {
                                                         type="date"
                                                         value={editForm.date}
                                                         onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
-                                                        className="px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded text-sm w-full hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
+                                                        className="px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded text-sm w-full hover:border-[hsl(var(--ring))] transition-colors"
                                                     />
                                                 </td>
                                                 <td className="px-4 py-3">
@@ -241,7 +278,7 @@ export default function TransactionsList({ filterType = null, limit = null }) {
                                                         type="text"
                                                         value={editForm.description || ''}
                                                         onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                                                        className="px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded text-sm w-full hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
+                                                        className="px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded text-sm w-full hover:border-[hsl(var(--ring))] transition-colors"
                                                         placeholder="Description"
                                                     />
                                                 </td>
@@ -250,14 +287,14 @@ export default function TransactionsList({ filterType = null, limit = null }) {
                                                         type="text"
                                                         value={editForm.category}
                                                         onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                                                        className="px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded text-sm w-full hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
+                                                        className="px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded text-sm w-full hover:border-[hsl(var(--ring))] transition-colors"
                                                     />
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <select
                                                         value={editForm.status || 'pending'}
                                                         onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                                                        className="px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded text-sm hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
+                                                        className="px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded text-sm hover:border-[hsl(var(--ring))] transition-colors"
                                                     >
                                                         <option value="completed">Completed</option>
                                                         <option value="pending">Pending</option>
@@ -268,19 +305,19 @@ export default function TransactionsList({ filterType = null, limit = null }) {
                                                         type="number"
                                                         value={editForm.amount}
                                                         onChange={(e) => setEditForm({ ...editForm, amount: parseFloat(e.target.value) })}
-                                                        className="px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded text-sm w-24 text-right hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
+                                                        className="px-2 py-1 bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded text-sm w-24 text-right hover:border-[hsl(var(--ring))] transition-colors"
                                                     />
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
                                                     <button onClick={handleSaveEdit} className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 mr-2 text-sm font-medium transition-colors">Save</button>
-                                                    <button onClick={() => setEditingId(null)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors">Cancel</button>
+                                                    <button onClick={() => setEditingId(null)} className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors">Cancel</button>
                                                 </td>
                                             </>
                                         ) : (
                                             <>
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center gap-2">
-                                                        <FiCalendar className="w-4 h-4 text-gray-400" />
+                                                        <FiCalendar className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
                                                         <span className="text-sm text-[hsl(var(--foreground))]">
                                                             {new Date(transaction.date).toLocaleDateString('en-US', {
                                                                 month: 'short',
@@ -295,11 +332,11 @@ export default function TransactionsList({ filterType = null, limit = null }) {
                                                         <p className="text-sm font-medium text-[hsl(var(--foreground))]">
                                                             {transaction.description || transaction.category}
                                                         </p>
-                                                        <p className="text-xs text-gray-500">{transaction.type === 'income' ? 'Income' : 'Expense'}</p>
+                                                        <p className="text-xs text-[hsl(var(--muted-foreground))]">{transaction.type === 'income' ? 'Income' : 'Expense'}</p>
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLORS[transaction.category] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'}`}>
+                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${categoryStyle}`}>
                                                         {transaction.category}
                                                     </span>
                                                 </td>
@@ -317,10 +354,10 @@ export default function TransactionsList({ filterType = null, limit = null }) {
                                                         <div className="flex items-center justify-center gap-1">
                                                             <button
                                                                 onClick={() => handleEdit(transaction)}
-                                                                className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
+                                                                className="p-1.5 hover:bg-[hsl(var(--accent))] rounded-lg transition-all duration-200"
                                                                 title="Edit"
                                                             >
-                                                                <FiEdit2 className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                                                <FiEdit2 className="w-4 h-4 text-[hsl(var(--muted-foreground))]" />
                                                             </button>
                                                             <button
                                                                 onClick={() => deleteTransaction(transaction.id)}
@@ -345,24 +382,24 @@ export default function TransactionsList({ filterType = null, limit = null }) {
             {filteredTransactions.length > 0 && !limit && (
                 <div className="p-4 border-t border-[hsl(var(--border))]">
                     <div className="flex items-center justify-between">
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-[hsl(var(--muted-foreground))]">
                             Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length} transactions
                         </p>
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                                 disabled={currentPage === 1}
-                                className="p-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-all duration-200"
+                                className="p-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[hsl(var(--accent))] hover:border-[hsl(var(--ring))] transition-all duration-200"
                             >
                                 <FiChevronLeft className="w-4 h-4" />
                             </button>
-                            <span className="text-sm text-gray-600 dark:text-gray-400 px-2">
+                            <span className="text-sm text-[hsl(var(--muted-foreground))] px-2">
                                 Page {currentPage} of {totalPages}
                             </span>
                             <button
                                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                                 disabled={currentPage === totalPages}
-                                className="p-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-700 transition-all duration-200"
+                                className="p-2 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] text-[hsl(var(--foreground))] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[hsl(var(--accent))] hover:border-[hsl(var(--ring))] transition-all duration-200"
                             >
                                 <FiChevronRight className="w-4 h-4" />
                             </button>

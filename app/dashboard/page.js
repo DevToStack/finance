@@ -67,25 +67,26 @@ export default function OverviewPage() {
                 </div>
             </section>
 
-            {/* Budget & Spending Section */}
+            {/* Budget, Spending & Insights Section */}
             <section>
                 <div className="flex items-center gap-2 mb-4">
                     <FiPieChart className="w-5 h-5 text-[hsl(var(--muted-foreground))]" />
-                    <h2 className="text-lg font-semibold text-[hsl(var(--foreground))]">Budget & Spending</h2>
+                    <h2 className="text-lg font-semibold text-[hsl(var(--foreground))]">Budget, Spending & Insights</h2>
                 </div>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <BudgetTracking />
-                    <SpendingBreakdown />
-                </div>
-            </section>
 
-            {/* Insights Section */}
-            <section>
-                <div className="flex items-center gap-2 mb-4">
-                    <FiTarget className="w-5 h-5 text-[hsl(var(--muted-foreground))]" />
-                    <h2 className="text-lg font-semibold text-[hsl(var(--foreground))]">Insights</h2>
+                {/* Responsive Grid Layout */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                    {/* Budget Tracking - Full width on mobile, spans appropriately on larger screens */}
+                    <div className="lg:col-span-1">
+                        <BudgetTracking />
+                    </div>
+
+                    {/* Spending & Insights Container */}
+                    <div className="space-y-4 sm:space-y-6 md:col-span-2 lg:col-span-2">
+                        <SpendingBreakdown />
+                        <InsightsSection />
+                    </div>
                 </div>
-                <InsightsSection />
             </section>
 
             {/* Recent Transactions */}
