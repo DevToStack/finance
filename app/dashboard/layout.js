@@ -10,7 +10,7 @@ function DashboardContent({ children }) {
     <div className="min-h-screen bg-[hsl(var(--background))] text-[hsl(var(--foreground))]">
       <div className="flex">
         <Sidebar />
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 max-w-7xl">
           {/* Mobile spacer for top bar */}
           <div className="md:hidden h-16" />
           <div
