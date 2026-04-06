@@ -1,5 +1,8 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { FinanceProvider } from "@/context/FinanceContext";
+import { ThemeProvider } from "@/components/ThemeProvider";
+import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,10 +22,35 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
+      <head>
+        {/* Theme script runs BEFORE any React code */}
+        <Script
+          id="theme-loader"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+                            (function() {
+                                // Check for saved theme or system preference
+                                const savedTheme = localStorage.getItem('theme');
+                                const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                                
+                                if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
+                                    document.documentElement.classList.add('dark');
+                                } else {
+                                    document.documentElement.classList.remove('dark');
+                                }
+                            })();
+                        `
+          }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <ThemeProvider>
+          <FinanceProvider>{children}</FinanceProvider>
+        </ThemeProvider>
+
       </body>
     </html>
   );
