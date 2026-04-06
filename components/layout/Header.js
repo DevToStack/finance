@@ -70,7 +70,7 @@ export default function Header() {
     const logoutHover = isDark ? 'hover:bg-red-900/20' : 'hover:bg-red-50';
 
     return (
-        <header className={`${headerBg} ${borderColor} border-b px-6 py-4 transition-all duration-300`}>
+        <header className={`${headerBg} ${borderColor} border-b px-6 py-4 transition-all duration-300 max-md:hidden`}>
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className={`text-2xl font-bold ${textPrimary}`}>Dashboard</h1>

@@ -132,8 +132,8 @@ export function FinanceProvider({ children }) {
     // Filter transactions for display (client-side filtering)
     const getFilteredTransactionsForDisplay = useCallback(() => {
         return allTransactions.filter(transaction => {
-            // Parse the UTC date from database
-            const transactionDateUTC = new Date(transaction.transaction_date);
+            // Parse the UTC ISO string from API
+            const transactionDate = new Date(transaction.transaction_date);
 
             // Create UTC dates for start and end (at beginning of day UTC)
             const startUTC = new Date(Date.UTC(
@@ -150,7 +150,7 @@ export function FinanceProvider({ children }) {
                 23, 59, 59, 999
             ));
 
-            const isWithinDateRange = transactionDateUTC >= startUTC && transactionDateUTC <= endUTC;
+            const isWithinDateRange = transactionDate >= startUTC && transactionDate <= endUTC;
 
             const matchesCategory = selectedCategory === 'all' ||
                 transaction.category === selectedCategory;
@@ -183,7 +183,7 @@ export function FinanceProvider({ children }) {
         } else {
             setLoading(false);
         }
-    }, [token]); // Remove selectedDateRange and selectedCategory from dependencies
+    }, [token]);
 
     const loadAllData = async () => {
         setLoading(true);
@@ -306,7 +306,7 @@ export function FinanceProvider({ children }) {
 
         return {
             ...budget,
-            amount: budgetAmount, // Ensure amount is a number
+            amount: budgetAmount,
             spent,
             percentage: Math.min(percentage, 100),
             remaining: Math.max(remaining, 0),
@@ -316,133 +316,103 @@ export function FinanceProvider({ children }) {
             progressWidth: Math.min(percentage, 100)
         };
     }, [budgets, allTransactions]);
-    // In FinanceContext.jsx - Updated getBalanceTrendData
-    // In your FinanceContext.jsx, update the getBalanceTrendData function
 
     const getBalanceTrendData = useCallback((startDate, endDate, interval = 'day') => {
-        if (!allTransactions.length) return [];
+        if (!allTransactions || !allTransactions.length) return [];
 
-        // Helper function to convert UTC to local date for comparison
-        const getLocalDate = (utcDate) => {
-            const date = new Date(utcDate);
-            return new Date(date.getFullYear(), date.getMonth(), date.getDate());
-        };
+        const startUTC = new Date(Date.UTC(
+            startDate.getFullYear(),
+            startDate.getMonth(),
+            startDate.getDate(),
+            0, 0, 0, 0
+        ));
 
-        // Helper function to get local hour
-        const getLocalHour = (utcDate) => {
-            const date = new Date(utcDate);
-            return date.getHours();
-        };
+        const endUTC = new Date(Date.UTC(
+            endDate.getFullYear(),
+            endDate.getMonth(),
+            endDate.getDate(),
+            23, 59, 59, 999
+        ));
 
-        // Helper function to check if date is today in local timezone
-        const isToday = (date) => {
-            const today = new Date();
-            return date.getDate() === today.getDate() &&
-                date.getMonth() === today.getMonth() &&
-                date.getFullYear() === today.getFullYear();
-        };
-
-        // Convert startDate and endDate to local time for comparison
-        const localStartDate = new Date(startDate);
-        const localEndDate = new Date(endDate);
-
-        // Filter transactions within date range using local date comparison
         const filteredTransactions = allTransactions.filter(t => {
             const tDate = new Date(t.transaction_date);
-            const tLocalDate = new Date(tDate.getFullYear(), tDate.getMonth(), tDate.getDate());
-            return tLocalDate >= localStartDate && tLocalDate <= localEndDate;
+            return tDate >= startUTC && tDate <= endUTC;
         });
 
-        // Sort by UTC date (oldest first for cumulative calculation)
         const sortedTransactions = [...filteredTransactions].sort(
             (a, b) => new Date(a.transaction_date) - new Date(b.transaction_date)
         );
 
-        // Group by interval
-        const groupedData = new Map();
-
-        if (interval === 'hour' && isToday(localStartDate) && isToday(localEndDate)) {
-            // For today - group by LOCAL hour
-            const currentLocalHour = new Date().getHours();
-
-            // Initialize only hours from 0 to current local hour
-            for (let hour = 0; hour <= currentLocalHour; hour++) {
-                const hourStr = hour.toString().padStart(2, '0');
-                const key = `${hourStr}:00`;
-                groupedData.set(key, {
-                    time: key,
-                    balance: 0,
-                    transactions: [],
-                    displayDate: `${hourStr}:00`,
-                    hour: hour,
-                    income: 0,     // Initialize to 0
-                    expense: 0     // Initialize to 0
-                });
-            }
-
+        // For minute-based precision (Today view)
+        if (interval === 'hour') {
+            const dataPoints = [];
             let runningBalance = 0;
 
-            // Process transactions by their LOCAL hour
-            sortedTransactions.forEach(t => {
-                const tUTC = new Date(t.transaction_date);
-                const localHour = tUTC.getHours();
-                const hourStr = localHour.toString().padStart(2, '0');
-                const key = `${hourStr}:00`;
-                const amount = parseFloat(t.amount);
-                runningBalance += t.type === 'income' ? amount : -amount;
+            const startOfDay = new Date(startUTC);
 
-                const existing = groupedData.get(key);
-                if (existing) {
-                    existing.balance = runningBalance;
-                    existing.transactions.push(t);
-                    if (t.type === 'income') {
-                        existing.income = (existing.income || 0) + amount;
-                    } else {
-                        existing.expense = (existing.expense || 0) + amount;
-                    }
-                }
+            // Add starting point
+            dataPoints.push({
+                time: format(startOfDay, 'HH:mm'),
+                displayLabel: format(startOfDay, 'HH:mm'),
+                balance: 0,
+                transactions: [],
+                income: 0,
+                expense: 0,
+                isInitial: true,
+                hour: startOfDay.getHours(),
+                minute: startOfDay.getMinutes()
             });
 
-            // Fill forward balances for hours with no transactions
-            let lastBalance = 0;
-            const sortedHours = Array.from(groupedData.keys()).sort();
-            for (const key of sortedHours) {
-                const data = groupedData.get(key);
-                if (data.transactions.length === 0) {
-                    data.balance = lastBalance;
-                } else {
-                    lastBalance = data.balance;
-                }
-            }
+            // Create a point for EACH transaction at its exact minute
+            sortedTransactions.forEach((transaction) => {
+                const tUTC = new Date(transaction.transaction_date);
+                const amount = parseFloat(transaction.amount);
+
+                runningBalance += transaction.type === 'income' ? amount : -amount;
+                const timeStr = format(tUTC, 'HH:mm');
+
+                dataPoints.push({
+                    time: timeStr,
+                    displayLabel: timeStr,
+                    balance: runningBalance,
+                    transactions: [transaction],
+                    income: transaction.type === 'income' ? amount : 0,
+                    expense: transaction.type === 'expense' ? amount : 0,
+                    hour: tUTC.getHours(),
+                    minute: tUTC.getMinutes(),
+                    exactTime: tUTC
+                });
+            });
+
+            return dataPoints;
         }
         else {
-            // For day/month ranges - group by LOCAL date
-            const currentDate = new Date(localStartDate);
-            const endDateTime = new Date(localEndDate);
+            // For day ranges - group by date
+            const startUTCDate = new Date(Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()));
+            const endUTCDate = new Date(Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59));
 
-            // Reset to start of day for consistent comparison
-            currentDate.setHours(0, 0, 0, 0);
-            endDateTime.setHours(23, 59, 59, 999);
+            const groupedData = new Map();
+            let currentDate = new Date(startUTCDate);
 
-            while (currentDate <= endDateTime) {
+            while (currentDate <= endUTCDate) {
                 const dateKey = currentDate.toISOString().split('T')[0];
                 groupedData.set(dateKey, {
                     date: dateKey,
+                    displayLabel: format(currentDate, 'MMM dd'), // Unified field
                     displayDate: format(currentDate, 'MMM dd'),
                     balance: 0,
                     transactions: [],
-                    income: 0,     // Initialize to 0
-                    expense: 0,     // Initialize to 0
+                    income: 0,
+                    expense: 0,
                     time: null
                 });
-                currentDate.setDate(currentDate.getDate() + 1);
+                currentDate.setUTCDate(currentDate.getUTCDate() + 1);
             }
 
             let runningBalance = 0;
             sortedTransactions.forEach(t => {
                 const tUTC = new Date(t.transaction_date);
-                const tLocalDate = new Date(tUTC.getFullYear(), tUTC.getMonth(), tUTC.getDate());
-                const dateKey = tLocalDate.toISOString().split('T')[0];
+                const dateKey = tUTC.toISOString().split('T')[0];
                 const amount = parseFloat(t.amount);
                 runningBalance += t.type === 'income' ? amount : -amount;
 
@@ -458,7 +428,6 @@ export function FinanceProvider({ children }) {
                 }
             });
 
-            // Fill forward balances for days with no transactions
             let lastBalance = 0;
             const sortedDates = Array.from(groupedData.keys()).sort();
             for (const dateKey of sortedDates) {
@@ -469,12 +438,11 @@ export function FinanceProvider({ children }) {
                     lastBalance = data.balance;
                 }
             }
-        }
 
-        const result = Array.from(groupedData.values());
-        return result;
+            return Array.from(groupedData.values());
+        }
     }, [allTransactions]);
-    
+
     // Auth Operations
     const login = useCallback(async (email, password) => {
         try {
@@ -524,30 +492,43 @@ export function FinanceProvider({ children }) {
         localStorage.removeItem('user');
     }, []);
 
+    // FIXED: Transaction CRUD Operations with proper UTC handling
     const addTransaction = useCallback(async (transaction) => {
         try {
             setError(null);
 
-            let transactionDateTime;
+            let utcDateTime;
 
             if (transaction.date) {
-                // Parse the selected date
+                // Parse the selected date (YYYY-MM-DD from date picker)
                 const [year, month, day] = transaction.date.split('T')[0].split('-');
 
                 // Get current LOCAL time
                 const now = new Date();
 
-                // Create a date string in LOCAL time (no UTC conversion)
-                // Format: YYYY-MM-DD HH:MM:SS
-                const localDateTimeStr = `${year}-${month}-${day} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+                // Create a Date object using LOCAL date and time
+                // Month is 0-indexed in JavaScript Date constructor
+                const localDateTime = new Date(
+                    parseInt(year),
+                    parseInt(month) - 1,
+                    parseInt(day),
+                    now.getHours(),
+                    now.getMinutes(),
+                    now.getSeconds(),
+                    now.getMilliseconds()
+                );
 
-                transactionDateTime = localDateTimeStr;
+                // Convert to UTC ISO string
+                utcDateTime = localDateTime.toISOString();
 
-                console.log('Sending local time:', transactionDateTime);
+                console.log('Creating transaction:', {
+                    selectedDate: transaction.date,
+                    localDateTime: localDateTime.toString(),
+                    utcDateTime: utcDateTime
+                });
             } else {
-                // Use current LOCAL date and time
-                const now = new Date();
-                transactionDateTime = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+                // Use current UTC time
+                utcDateTime = new Date().toISOString();
             }
 
             const formattedTransaction = {
@@ -555,7 +536,7 @@ export function FinanceProvider({ children }) {
                 category: transaction.category,
                 type: transaction.type,
                 description: transaction.description || '',
-                transaction_date: transactionDateTime // Send as string, not Date object
+                transaction_date: utcDateTime // Send UTC ISO string
             };
 
             const response = await api.post('/transactions', formattedTransaction);
@@ -572,11 +553,27 @@ export function FinanceProvider({ children }) {
         try {
             setError(null);
             const formattedData = {};
+
             if (updatedData.amount !== undefined) formattedData.amount = updatedData.amount;
             if (updatedData.category !== undefined) formattedData.category = updatedData.category;
             if (updatedData.type !== undefined) formattedData.type = updatedData.type;
             if (updatedData.description !== undefined) formattedData.description = updatedData.description;
-            if (updatedData.date !== undefined) formattedData.transaction_date = updatedData.date;
+
+            if (updatedData.date !== undefined) {
+                // Convert to UTC ISO string if date is being updated
+                const [year, month, day] = updatedData.date.split('T')[0].split('-');
+                const now = new Date();
+                const localDateTime = new Date(
+                    parseInt(year),
+                    parseInt(month) - 1,
+                    parseInt(day),
+                    now.getHours(),
+                    now.getMinutes(),
+                    now.getSeconds(),
+                    now.getMilliseconds()
+                );
+                formattedData.transaction_date = localDateTime.toISOString();
+            }
 
             const response = await api.put(`/transactions/${id}`, formattedData);
             setAllTransactions(prev => prev.map(transaction =>
@@ -616,7 +613,6 @@ export function FinanceProvider({ children }) {
         }
     }, [api]);
 
-    // In FinanceContext.jsx - Fix updateBudget
     const updateBudget = useCallback(async (id, updatedData) => {
         try {
             setError(null);
@@ -728,8 +724,8 @@ export function FinanceProvider({ children }) {
 
     const value = {
         // State
-        transactions: allTransactions, // Keep for backward compatibility
-        allTransactions, // Explicitly expose all transactions
+        transactions: allTransactions,
+        allTransactions,
         budgets,
         categories,
         user,
@@ -743,7 +739,7 @@ export function FinanceProvider({ children }) {
         totalExpense,
         expenseByCategory,
         incomeByCategory,
-        monthlyTrends, // This now contains ALL months from all transactions
+        monthlyTrends,
         isAuthenticated: !!token,
 
         // Auth Actions
@@ -773,7 +769,7 @@ export function FinanceProvider({ children }) {
         setSearchQuery,
 
         // Helper
-        getFilteredTransactionsForDisplay, // For components that need filtered data
+        getFilteredTransactionsForDisplay,
         refreshData,
         exportData,
     };

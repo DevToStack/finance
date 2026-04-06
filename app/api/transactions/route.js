@@ -4,36 +4,33 @@ import { NextResponse } from "next/server";
 import { authenticateToken } from "@/middleware/auth";
 import pool from "@/lib/db";
 
-// NEW: Store datetime as-is without timezone conversion
+// FIXED: Convert UTC ISO string to MySQL datetime (storing UTC)
 const formatDateTimeForMySQL = (dateTime) => {
     if (!dateTime) return null;
 
-    // If it's already in YYYY-MM-DD HH:MM:SS format, use it directly
-    if (typeof dateTime === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateTime)) {
-        return dateTime;
-    }
-
-    // Try to parse as Date object and convert to local time string
+    // Parse the ISO string (which should be UTC)
     const d = new Date(dateTime);
     if (isNaN(d.getTime())) return null;
 
-    // Convert to local datetime string (YYYY-MM-DD HH:MM:SS)
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    const seconds = String(d.getSeconds()).padStart(2, '0');
+    // Extract UTC components to store in database
+    const year = d.getUTCFullYear();
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    const hours = String(d.getUTCHours()).padStart(2, '0');
+    const minutes = String(d.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(d.getUTCSeconds()).padStart(2, '0');
 
+    // Return MySQL datetime string (will be stored as UTC)
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
-// Keep date-only version for queries
+// Helper for date-only queries (without time component)
 const formatDateForMySQL = (date) => {
     if (!date) return null;
     const d = new Date(date);
     if (isNaN(d.getTime())) return null;
-    return d.toISOString().split('T')[0];
+    // Use UTC to maintain consistency
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
 };
 
 // GET /api/transactions - Get all transactions for authenticated user
@@ -88,10 +85,10 @@ export async function GET(request) {
 
         const [transactions] = await pool.execute(query, params);
 
-        // Format the dates for frontend - add 'Z' to indicate UTC for consistent parsing
+        // FIXED: Convert MySQL datetime (stored as UTC) to ISO string
         const formattedTransactions = transactions.map(t => ({
             ...t,
-            transaction_date: t.transaction_date ? t.transaction_date + 'Z' : null
+            transaction_date: t.transaction_date ? new Date(t.transaction_date).toISOString() : null
         }));
 
         return NextResponse.json(formattedTransactions);
@@ -140,12 +137,12 @@ export async function POST(request) {
             );
         }
 
-        // Format the datetime for MySQL (preserve local time)
+        // FIXED: Convert UTC ISO string to MySQL datetime
         const formattedDateTime = formatDateTimeForMySQL(transaction_date);
 
         if (!formattedDateTime) {
             return NextResponse.json(
-                { error: 'Invalid date format. Please provide a valid date/time.' },
+                { error: 'Invalid date format. Please provide a valid ISO date string.' },
                 { status: 400 }
             );
         }
@@ -169,11 +166,11 @@ export async function POST(request) {
             [result.insertId]
         );
 
-        // Format the response - add 'Z' for frontend
+        // FIXED: Convert back to ISO string for response
         const formattedResponse = {
             ...newTransaction[0],
             transaction_date: newTransaction[0].transaction_date ?
-                newTransaction[0].transaction_date + 'Z' : null
+                new Date(newTransaction[0].transaction_date).toISOString() : null
         };
 
         return NextResponse.json(formattedResponse, { status: 201 });
@@ -198,7 +195,7 @@ export async function PUT(request, { params }) {
             );
         }
 
-        const { id } = params;
+        const { id } = await params;
         const { amount, category, type, description, transaction_date } = await request.json();
 
         // Check if transaction exists and belongs to user
@@ -235,10 +232,11 @@ export async function PUT(request, { params }) {
             values.push(description);
         }
         if (transaction_date !== undefined) {
+            // FIXED: Convert UTC ISO string to MySQL datetime
             const formattedDateTime = formatDateTimeForMySQL(transaction_date);
             if (!formattedDateTime) {
                 return NextResponse.json(
-                    { error: 'Invalid date format' },
+                    { error: 'Invalid date format. Please provide a valid ISO date string.' },
                     { status: 400 }
                 );
             }
@@ -267,11 +265,11 @@ export async function PUT(request, { params }) {
             [id]
         );
 
-        // Format the response - add 'Z' for frontend
+        // FIXED: Convert back to ISO string for response
         const formattedResponse = {
             ...updated[0],
             transaction_date: updated[0].transaction_date ?
-                updated[0].transaction_date + 'Z' : null
+                new Date(updated[0].transaction_date).toISOString() : null
         };
 
         return NextResponse.json(formattedResponse);
