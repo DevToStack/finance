@@ -182,12 +182,12 @@ export default function Sidebar() {
 
             {/* Sidebar */}
             <div className={`
-                fixed top-0 left-0 h-screen z-50 
+                fixed top-0 left-0 max-h-screen z-50 
                 transform transition-all duration-300 ease-in-out
                 lg:relative lg:translate-x-0
                 ${isOpen ? 'translate-x-0' : '-translate-x-full'}
             `}>
-                <div className={`w-72 h-full ${sidebarBg} ${borderColor} border-r flex flex-col`}>
+                <div className={`w-72 h-full max-h-screen ${sidebarBg} ${borderColor} border-r flex flex-col`}>
                     {/* Header with App Name and Close Button */}
                     <div className={`p-5 ${borderColor} border-b`}>
                         <div className="flex items-center justify-between">

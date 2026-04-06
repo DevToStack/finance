@@ -89,8 +89,8 @@ export default function LoginPage() {
     // Demo credentials for testing
     const fillDemoCredentials = () => {
         setFormData({
-            email: 'john@example.com',
-            password: 'password123'
+            email: 'strange@finance.com',
+            password: 'financesage2'
         });
     };
 
