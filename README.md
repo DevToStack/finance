@@ -4,14 +4,10 @@
 
  ## Live Demo
 
- - **Demo URL**: _Add your deployed link here_
- - **Screenshots**: add images under `public/screenshots/` and update the links below.
+ - **Demo URL**: https://finance-sage-alpha.vercel.app
+ - **Screenshots**:
 
- ```
- public/screenshots/overview.png
- public/screenshots/income.png
- public/screenshots/expenses.png
- ```
+![Alt text](public/screenshots/overview.png)
 
  ## Key Features
 
