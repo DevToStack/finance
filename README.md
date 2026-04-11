@@ -6,8 +6,10 @@
 
  - **Demo URL**: https://finance-sage-alpha.vercel.app
  - **Screenshots**:
-
-![Alt text](public/screenshots/overview.png)
+    - Overview(Light)
+    ![Alt text](public/screenshots/overview.png)
+    - Overview(Dark)
+    ![Alt text](public/screenshots/overview2.png)
 
  ## Key Features
 
